@@ -1,0 +1,109 @@
+# Importing Libraries
+import os
+import numpy as np
+import cv2
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#Directories
+malignant_dir = '/kaggle/input/skin-lesion-2/new_labelled_image_data/1'
+benign_dir = '/kaggle/input/skin-lesion-2/new_labelled_image_data/0'
+synthetic_dir = '/kaggle/input/skin-lesion-2/new_labelled_image_data/FID_FINAL_IMGS'
+test_dir = '/kaggle/input/skin-lesion-2/new_labelled_image_data/Test Set'
+metadata_path = '/kaggle/input/train-metadata/train-metadata.csv'
+
+# Loading Images
+def load_images(folder, label, image_size=(140, 140)):
+    images = []
+    labels = []
+    for filename in os.listdir(folder):
+        img_path = os.path.join(folder, filename)
+        img = cv2.imread(img_path)
+        if img is not None:
+            img = cv2.resize(img, image_size)
+            images.append(img)
+            labels.append(label)
+    return images, labels
+
+benign_images, benign_labels = load_images(benign_dir, 0)
+malignant_images, malignant_labels = load_images(malignant_dir, 1)
+
+# Loading Phase-3 Synthetic Data 
+synthetic_images, synthetic_labels = load_images(synthetic_dir, 1)
+synthetic_images_phase_1 = synthetic_images[:1560]
+synthetic_labels_phase_1 = [1] * 1560
+images_phase_1 = np.array(benign_images + malignant_images + synthetic_images_phase_1)
+labels_phase_1 = np.array(benign_labels + malignant_labels + synthetic_labels_phase_1)
+
+# Normalise and Reshaping
+images_phase_1 = images_phase_1 / 255.0
+images_flat_phase_1 = images_phase_1.reshape(images_phase_1.shape[0], -1)
+
+# Data Splitting 
+X_train_1, X_val_1, y_train_1, y_val_1 = train_test_split(images_flat_phase_1, labels_phase_1, test_size=0.3, random_state=25, stratify=labels_phase_1)
+
+# Model Building
+svc3 = SVC(random_state=25)
+svc3.fit(X_train_1, y_train_1)
+y_val_pred_1 = svc3.predict(X_val_1)
+
+# Model evaluation
+accuracy_1 = accuracy_score(y_val_1, y_val_pred_1)
+classification_report_1 = classification_report(y_val_1, y_val_pred_1, target_names=['Benign', 'Malignant'])
+print("SVM - Phase 3")
+print("----------------------------")
+print(f"Accuracy: {accuracy_1:.4f}")
+print("Classification Report:\n", classification_report_1)
+conf_matrix_1 = confusion_matrix(y_val_1, y_val_pred_1)
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix_1, annot=True, fmt="d", cmap="inferno", xticklabels=['Benign', 'Malignant'], yticklabels=['Benign', 'Malignant'])
+plt.xlabel('Predicted Labels')
+plt.ylabel('True Labels')
+plt.title('Phase 3 Confusion Matrix (SVM)')
+plt.show()
+
+# Laoding Test Data 
+metadata = pd.read_csv(metadata_path)
+test_filenames = os.listdir(test_dir)
+test_ids = [filename.split('.')[0] for filename in test_filenames]
+test_metadata = metadata[metadata['isic_id'].isin(test_ids)]
+
+# Mapping the images ids to their respective labels
+id_conversion = dict(zip(test_metadata['isic_id'], test_metadata['target']))
+test_labels = []
+test_images = []
+for filename in test_filenames:
+    img_path = os.path.join(test_dir, filename)
+    img = cv2.imread(img_path)
+    if img is not None:
+        img = cv2.resize(img, (140, 140))
+        test_images.append(img)
+        image_id = filename.split('.')[0]
+        label = id_conversion.get(image_id)
+        test_labels.append(label)
+
+test_labels = np.array(test_labels)
+
+# Normalising and Reshaping 
+test_images = np.array(test_images) / 255.0
+test_images_flat = test_images.reshape(test_images.shape[0], -1)
+y_test_pred_1 = svc3.predict(test_images_flat)
+test_accuracy_1 = accuracy_score(test_labels, y_test_pred_1)
+test_classification_report_1 = classification_report(test_labels, y_test_pred_1, target_names=['Benign', 'Malignant'])
+print("SVM - Phase 3 (Test Set)")
+print("----------------------------")
+print(f"Test Set Accuracy: {test_accuracy_1:.4f}")
+print("Test Set Classification Report:\n", test_classification_report_1)
+
+# Model Evaluation on Test Set
+test_conf_matrix_1 = confusion_matrix(test_labels, y_test_pred_1)
+plt.figure(figsize=(8, 6))
+sns.heatmap(test_conf_matrix_1, annot=True, fmt="d", cmap="inferno", xticklabels=['Benign', 'Malignant'], yticklabels=['Benign', 'Malignant'])
+plt.xlabel('Predicted Labels')
+plt.ylabel('True Labels')
+plt.title('Phase 3 Test Set Confusion Matrix (SVM)')
+plt.show()
