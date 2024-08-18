@@ -11,7 +11,7 @@ This folder consists of 6 other folders. Each folder is dedicated for one algori
 All the files are .py 
 
 3. GAN architecture:
-This folder consists of the implementation of ``CycleGAN with Domain Adaptation" and ``Wasserstein GAN with Gradient Penalty". 
+This folder consists of the implementation of "CycleGAN with Domain Adaptation" and "Wasserstein GAN with Gradient Penalty". 
 
 The link to the dataset that was used is from kaggle: 
 https://www.kaggle.com/competitions/isic-2024-challenge?utm_medium=email
